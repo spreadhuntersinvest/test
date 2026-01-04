@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Research - Fundamental Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding-top: 40px;
+        }
+
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        /* FILTROS */
+        .filters-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .filters-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .filter-btn {
+            padding: 10px 16px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            color: #333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .clear-filters {
+            padding: 10px 16px;
+            background: #f5f5f5;
+            color: #666;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .clear-filters:hover {
+            background: #e0e0e0;
+        }
+
+        .filters-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        /* VISTA POR TIPO DE INVERSIÓN */
+        .investment-type-section {
+            margin-bottom: 50px;
+        }
+
+        .investment-type-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .investment-type-icon {
+            font-size: 2em;
+        }
+
+        .investment-type-title {
+            color: white;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+
+        .investment-type-count {
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 12px;
+            border-radius: 20px;
+            color: white;
+            font-size: 0.95em;
+            font-weight: 600;
+        }
+
+        .research-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .research-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none; /* Quitamos subrayado del enlace */
+        }
+
+        .research-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .card-ticker {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .card-company {
+            font-size: 1.6em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .card-sector {
+            font-size: 0.9em;
+            opacity: 0.85;
+            margin-bottom: 15px;
+        }
+
+        .card-upside {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: 600;
+            display: inline-block;
+            font-size: 0.95em;
+        }
+
+        .upside-positive {
+            color: #4ade80;
+        }
+
+        .upside-negative {
+            color: #fca5a5;
+        }
+
+        .card-body {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-metrics {
+            margin-bottom: 15px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.9em;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .card-date {
+            font-size: 0.8em;
+            color: #999;
+            margin-bottom: 15px;
+        }
+
+        .card-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+            display: block;
+        }
+
+        .card-button:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+        }
+
+        .no-results {
+            text-align: center;
+            color: white;
+            padding: 40px 20px;
+        }
+
+        .no-results h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.9em;
+        }
+
+        footer a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+
+            .research-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card-company {
+                font-size: 1.3em;
+            }
+
+            .filters-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+
+            .investment-type-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .investment-type-count {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Investment Research</h1>
+            <p>Análisis fundamental de situaciones especiales de inversión</p>
+        </header>
+
+        <!-- SECCIÓN DE FILTROS -->
+        <div class="filters-section">
+            <div class="filters-title">🔍 Filtrar por tipo de inversión</div>
+            <div class="filters-grid" id="filtersContainer">
+                <!-- Los botones se generarán dinámicamente aquí -->
+            </div>
+            <div class="filters-actions">
+                <button class="clear-filters" onclick="clearFilters()">Limpiar filtros</button>
+            </div>
+        </div>
+
+        <!-- RESULTADOS AGRUPADOS POR TIPO DE INVERSIÓN -->
+        <div id="resultsContainer">
+            <!-- Los resultados se generarán dinámicamente aquí -->
+        </div>
+
+        <footer>
+            <p>© 2026 Investment Research. Análisis independiente. | <a href="#">Disclaimer</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURACIÓN DE TIPOS DE INVERSIÓN
+        // ============================================
+        const investmentTypes = {
+            'long-value-growth': { name: 'Long Value-Growth', icon: '📈', description: 'Compañías con crecimiento sólido', color: '#667eea' },
+            'spin-offs': { name: 'Spin-offs', icon: '🔀', description: 'Separación de unidades', color: '#8b5cf6' },
+            'shorts-situations': { name: 'Short Situations', icon: '⬇️', description: 'Oportunidades de venta corta', color: '#ef4444' },
+            'uplisting': { name: 'Uplisting', icon: '⬆️', description: 'Cambios de bolsa/índice', color: '#10b981' },
+            'demergers': { name: 'Demergers', icon: '📊', description: 'Escisiones de empresas', color: '#f59e0b' },
+            'tender-offers': { name: 'Tender Offers', icon: '🎯', description: 'Ofertas públicas', color: '#ec4899' },
+            'turnaround': { name: 'Turnaround', icon: '🔄', description: 'Empresas en recuperación', color: '#06b6d4' },
+            'takeover': { name: 'Takeover', icon: '🏢', description: 'Adquisiciones y fusiones', color: '#6366f1' },
+            'odd-lots': { name: 'Odd Lots', icon: '🎲', description: 'Pequeños números de acciones', color: '#a78bfa' }
+        };
+
+        // ============================================
+        // DATOS ESTÁTICOS (Sin llamar a APIs)
+        // ============================================
+        const researchesData = [
+            {
+                id: 'puuilo',
+                path: 'puuilo/index.html',
+                type: 'long-value-growth',
+                ticker: 'PUUILO.HE',
+                company: 'Puuilo',
+                sector: 'Retail - Home Décor',
+                fairValue: '€26,62',
+                currentPrice: '€12,52',
+                upside: '+113%',
+                riskLevel: 'Medio',
+                date: 'Enero 2026'
+            }
+            // Aquí podrás añadir más empresas en el futuro
+        ];
+
+        let activeFilters = new Set();
+
+        // ============================================
+        // RENDERIZADO
+        // ============================================
+        function renderFilters() {
+            const container = document.getElementById('filtersContainer');
+            container.innerHTML = Object.entries(investmentTypes).map(([key, type]) => `
+                <button 
+                    class="filter-btn ${activeFilters.has(key) ? 'active' : ''}" 
+                    onclick="toggleFilter('${key}')"
+                    title="${type.description}"
+                >
+                    ${type.icon} ${type.name}
+                </button>
+            `).join('');
+        }
+
+        function toggleFilter(typeKey) {
+            if (activeFilters.has(typeKey)) activeFilters.delete(typeKey);
+            else activeFilters.add(typeKey);
+            renderResults();
+            renderFilters();
+        }
+
+        function clearFilters() {
+            activeFilters.clear();
+            renderFilters();
+            renderResults();
+        }
+
+        function renderResults() {
+            const container = document.getElementById('resultsContainer');
+            
+            // Filtrar
+            const filtered = activeFilters.size === 0 
+                ? researchesData 
+                : researchesData.filter(r => activeFilters.has(r.type));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="no-results"><h3>📭 No hay análisis con estos filtros</h3></div>`;
+                return;
+            }
+
+            // Agrupar
+            const grouped = {};
+            filtered.forEach(r => {
+                if (!grouped[r.type]) grouped[r.type] = [];
+                grouped[r.type].push(r);
+            });
+
+            // HTML
+            container.innerHTML = Object.entries(grouped).map(([typeKey, items]) => {
+                const typeInfo = investmentTypes[typeKey];
+                return `
+                    <div class="investment-type-section">
+                        <div class="investment-type-header">
+                            <div class="investment-type-icon">${typeInfo.icon}</div>
+                            <div class="investment-type-title">${typeInfo.name}</div>
+                            <div class="investment-type-count">${items.length} análisis</div>
+                        </div>
+                        <div class="research-grid">
+                            ${items.map(item => `
+                                <a href="${item.path}" class="research-card">
+                                    <div class="card-header">
+                                        <div class="card-ticker">${item.ticker}</div>
+                                        <div class="card-company">${item.company}</div>
+                                        <div class="card-sector">${item.sector}</div>
+                                        <div class="card-upside"><span class="upside-positive">${item.upside}</span></div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="card-metrics">
+                                            <div class="metric"><span class="metric-label">Precio Actual</span><span class="metric-value">${item.currentPrice}</span></div>
+                                            <div class="metric"><span class="metric-label">Fair Value</span><span class="metric-value">${item.fairValue}</span></div>
+                                            <div class="metric"><span class="metric-label">Riesgo</span><span class="metric-value">${item.riskLevel}</span></div>
+                                        </div>
+                                        <div class="card-date">Análisis: ${item.date}</div>
+                                        <span class="card-button">Ver Análisis Completo →</span>
+                                    </div>
+                                </a>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // INICIAR
+        document.addEventListener('DOMContentLoaded', () => {
+            renderFilters();
+            renderResults();
+        });
+    </script>
+</body>
+</html>
