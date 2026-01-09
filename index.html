@@ -1,490 +1,473 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investment Research - Fundamental Analysis</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+<script>
+    // ============================================
+    // CONFIGURACIÓN API FINNHUB
+    // ============================================
+    const FINNHUB_API_KEY = 'YOUR_FINNHUB_KEY_HERE';  // ← REEMPLAZA CON TU KEY
+    const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1/quote';
+
+    // ============================================
+    // FUNCIÓN: Calcular upside actual automático
+    // ============================================
+    function calculateCurrentUpside(currentPriceRaw, fairValueRaw) {
+        if (!currentPriceRaw || !fairValueRaw || currentPriceRaw === 0) {
+            return '—';
         }
+        
+        const upside = ((fairValueRaw - currentPriceRaw) / currentPriceRaw) * 100;
+        const rounded = upside.toFixed(1);
+        
+        return upside >= 0 ? `+${rounded}%` : `${rounded}%`;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
-            min-height: 100vh;
-            padding: 20px;
-        }
+    // ============================================
+    // FUNCIÓN: Clasificar color según upside
+    // ============================================
+    function getUpsideClass(upsidePercent) {
+        const value = parseFloat(upsidePercent.replace('+', '').replace('%', ''));
+        
+        if (value >= 50) return 'upside-very-positive';
+        if (value > 0) return 'upside-positive';
+        if (value < -50) return 'upside-very-negative';
+        return 'upside-negative';
+    }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
+    // ============================================
+    // FUNCIÓN: Símbolo según dirección
+    // ============================================
+    function getUpsideSymbol(upsidePercent) {
+        const value = parseFloat(upsidePercent.replace('+', '').replace('%', ''));
+        return value >= 0 ? '📈' : '📉';
+    }
 
-        header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
-            padding-top: 40px;
-        }
+    // ============================================
+    // CONFIGURACIÓN DE TIPOS DE INVERSIÓN
+    // ============================================
+    const investmentTypes = {
+        'long-value-growth': { name: 'Long Value-Growth', icon: '📈', description: 'Compañías con crecimiento sólido', color: '#00d7ff' },
+        'spin-offs': { name: 'Spin-offs', icon: '🔀', description: 'Separación de unidades', color: '#00d7ff' },
+        'shorts-situations': { name: 'Short Situations', icon: '⬇️', description: 'Oportunidades de venta corta', color: '#ff6b6b' },
+        'uplisting': { name: 'Uplisting', icon: '⬆️', description: 'Cambios de bolsa/índice', color: '#90ee90' },
+        'demergers': { name: 'Demergers', icon: '📊', description: 'Escisiones de empresas', color: '#ffa500' },
+        'tender-offers': { name: 'Tender Offers', icon: '🎯', description: 'Ofertas públicas', color: '#00d7ff' },
+        'turnaround': { name: 'Turnaround', icon: '🔄', description: 'Empresas en recuperación', color: '#ffa500' },
+        'takeover': { name: 'Takeover', icon: '🏢', description: 'Adquisiciones y fusiones', color: '#00d7ff' },
+        'odd-lots': { name: 'Odd Lots', icon: '🎲', description: 'Pequeños números de acciones', color: '#b0c4de' }
+    };
 
-        header h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        header p {
-            font-size: 1.2em;
-            opacity: 0.95;
-        }
-
-        /* FILTROS */
-        .filters-section {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 40px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        .filters-title {
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 12px;
-        }
-
-        .filter-btn {
-            padding: 10px 16px;
-            border: 2px solid #e0e0e0;
-            background: white;
-            color: #333;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 0.95em;
-            transition: all 0.3s ease;
-        }
-
-        .filter-btn:hover {
-            border-color: #667eea;
-            background: #f5f7ff;
-        }
-
-        .filter-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
-        }
-
-        .clear-filters {
-            padding: 10px 16px;
-            background: #f5f5f5;
-            color: #666;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.3s ease;
-        }
-
-        .clear-filters:hover {
-            background: #e0e0e0;
-        }
-
-        .filters-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-
-        /* VISTA POR TIPO DE INVERSIÓN */
-        .investment-type-section {
-            margin-bottom: 50px;
-        }
-
-        .investment-type-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .investment-type-icon {
-            font-size: 2em;
-        }
-
-        .investment-type-title {
-            color: white;
-            font-size: 1.8em;
-            font-weight: 600;
-        }
-
-        .investment-type-count {
-            margin-left: auto;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 5px 12px;
-            border-radius: 20px;
-            color: white;
-            font-size: 0.95em;
-            font-weight: 600;
-        }
-
-        .research-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-
-        .research-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            text-decoration: none; /* Quitamos subrayado del enlace */
-        }
-
-        .research-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-        }
-
-        .card-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .card-ticker {
-            font-size: 0.85em;
-            opacity: 0.9;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .card-company {
-            font-size: 1.6em;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-
-        .card-sector {
-            font-size: 0.9em;
-            opacity: 0.85;
-            margin-bottom: 15px;
-        }
-
-        .card-upside {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 10px 15px;
-            border-radius: 6px;
-            font-weight: 600;
-            display: inline-block;
-            font-size: 0.95em;
-        }
-
-        .upside-positive {
-            color: #4ade80;
-        }
-
-        .upside-negative {
-            color: #fca5a5;
-        }
-
-        .card-body {
-            padding: 20px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .card-metrics {
-            margin-bottom: 15px;
-        }
-
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            font-size: 0.9em;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .metric:last-child {
-            border-bottom: none;
-        }
-
-        .metric-label {
-            color: #666;
-            font-weight: 500;
-        }
-
-        .metric-value {
-            color: #333;
-            font-weight: 600;
-        }
-
-        .card-date {
-            font-size: 0.8em;
-            color: #999;
-            margin-bottom: 15px;
-        }
-
-        .card-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.95em;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            text-align: center;
-            display: block;
-        }
-
-        .card-button:hover {
-            opacity: 0.9;
-            transform: scale(1.02);
-        }
-
-        .no-results {
-            text-align: center;
-            color: white;
-            padding: 40px 20px;
-        }
-
-        .no-results h3 {
-            font-size: 1.3em;
-            margin-bottom: 10px;
-        }
-
-        footer {
-            text-align: center;
-            color: rgba(255, 255, 255, 0.8);
-            padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            font-size: 0.9em;
-        }
-
-        footer a {
-            color: rgba(255, 255, 255, 0.8);
-            text-decoration: none;
-        }
-
-        @media (max-width: 768px) {
-            header h1 {
-                font-size: 2em;
-            }
-
-            .research-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .card-company {
-                font-size: 1.3em;
-            }
-
-            .filters-grid {
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            }
-
-            .investment-type-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .investment-type-count {
-                margin-left: 0;
-                margin-top: 10px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>📊 Investment Research</h1>
-            <p>Análisis fundamental de situaciones especiales de inversión</p>
-        </header>
-
-        <!-- SECCIÓN DE FILTROS -->
-        <div class="filters-section">
-            <div class="filters-title">🔍 Filtrar por tipo de inversión</div>
-            <div class="filters-grid" id="filtersContainer">
-                <!-- Los botones se generarán dinámicamente aquí -->
-            </div>
-            <div class="filters-actions">
-                <button class="clear-filters" onclick="clearFilters()">Limpiar filtros</button>
-            </div>
-        </div>
-
-        <!-- RESULTADOS AGRUPADOS POR TIPO DE INVERSIÓN -->
-        <div id="resultsContainer">
-            <!-- Los resultados se generarán dinámicamente aquí -->
-        </div>
-
-        <footer>
-            <p>© 2026 Investment Research. Análisis independiente. | <a href="#">Disclaimer</a></p>
-        </footer>
-    </div>
-
-    <script>
-        // ============================================
-        // CONFIGURACIÓN DE TIPOS DE INVERSIÓN
-        // ============================================
-        const investmentTypes = {
-            'long-value-growth': { name: 'Long Value-Growth', icon: '📈', description: 'Compañías con crecimiento sólido', color: '#667eea' },
-            'spin-offs': { name: 'Spin-offs', icon: '🔀', description: 'Separación de unidades', color: '#8b5cf6' },
-            'shorts-situations': { name: 'Short Situations', icon: '⬇️', description: 'Oportunidades de venta corta', color: '#ef4444' },
-            'uplisting': { name: 'Uplisting', icon: '⬆️', description: 'Cambios de bolsa/índice', color: '#10b981' },
-            'demergers': { name: 'Demergers', icon: '📊', description: 'Escisiones de empresas', color: '#f59e0b' },
-            'tender-offers': { name: 'Tender Offers', icon: '🎯', description: 'Ofertas públicas', color: '#ec4899' },
-            'turnaround': { name: 'Turnaround', icon: '🔄', description: 'Empresas en recuperación', color: '#06b6d4' },
-            'takeover': { name: 'Takeover', icon: '🏢', description: 'Adquisiciones y fusiones', color: '#6366f1' },
-            'odd-lots': { name: 'Odd Lots', icon: '🎲', description: 'Pequeños números de acciones', color: '#a78bfa' }
-        };
-
-        // ============================================
-        // DATOS ESTÁTICOS (Sin llamar a APIs)
-        // ============================================
-        const researchesData = [
-            {
-                id: 'puuilo',
-                path: 'puuilo/index.html',
-                type: 'long-value-growth',
-                ticker: 'PUUILO.HE',
-                company: 'Puuilo',
-                sector: 'Retail - Home Décor',
-                fairValue: '€26,62',
-                currentPrice: '€12,52',
-                upside: '+113%',
-                riskLevel: 'Medio',
-                date: 'Enero 2026'
-            }
-            // Aquí podrás añadir más empresas en el futuro
-        ];
-
-        let activeFilters = new Set();
-
-        // ============================================
-        // RENDERIZADO
-        // ============================================
-        function renderFilters() {
-            const container = document.getElementById('filtersContainer');
-            container.innerHTML = Object.entries(investmentTypes).map(([key, type]) => `
-                <button 
-                    class="filter-btn ${activeFilters.has(key) ? 'active' : ''}" 
-                    onclick="toggleFilter('${key}')"
-                    title="${type.description}"
-                >
-                    ${type.icon} ${type.name}
-                </button>
-            `).join('');
-        }
-
-        function toggleFilter(typeKey) {
-            if (activeFilters.has(typeKey)) activeFilters.delete(typeKey);
-            else activeFilters.add(typeKey);
-            renderResults();
-            renderFilters();
-        }
-
-        function clearFilters() {
-            activeFilters.clear();
-            renderFilters();
-            renderResults();
-        }
-
-        function renderResults() {
-            const container = document.getElementById('resultsContainer');
+    // ============================================
+    // FUNCIÓN: Obtener precio actual (API o manual)
+    // ============================================
+    async function fetchCurrentPrice(research) {
+        try {
+            // Intentar obtener de API Finnhub
+            const response = await fetch(
+                `${FINNHUB_BASE_URL}?symbol=${research.ticker_finnhub}&token=${FINNHUB_API_KEY}`
+            );
             
-            // Filtrar
-            const filtered = activeFilters.size === 0 
-                ? researchesData 
-                : researchesData.filter(r => activeFilters.has(r.type));
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="no-results"><h3>📭 No hay análisis con estos filtros</h3></div>`;
-                return;
+            if (!response.ok) throw new Error('API error');
+            
+            const data = await response.json();
+            
+            if (data.c) {  // c = current price en Finnhub
+                research.currentPriceRaw = data.c;
+                research.currentPrice = `${research.currency}${data.c.toFixed(2)}`;
+                
+                // ← RECALCULAR upside actual con el nuevo precio
+                research.upsideActual = calculateCurrentUpside(
+                    research.currentPriceRaw, 
+                    research.fairValueRaw
+                );
+                
+                console.log(`✅ API: ${research.ticker} = ${research.currentPrice} | Upside: ${research.upsideActual}`);
+                return research;
             }
+        } catch (error) {
+            console.warn(`⚠️ API fallo para ${research.ticker}, usando fallback manual`);
+        }
+        
+        // Fallback: usar valor manual del array
+        console.log(`📌 Manual: ${research.ticker} = ${research.currentPrice} | Upside: ${research.upsideActual}`);
+        return research;
+    }
 
-            // Agrupar
-            const grouped = {};
-            filtered.forEach(r => {
-                if (!grouped[r.type]) grouped[r.type] = [];
-                grouped[r.type].push(r);
-            });
+    // ============================================
+    // FUNCIÓN: Cargar todos los precios
+    // ============================================
+    async function loadAllPrices() {
+        try {
+            // Ejecutar fetch para todos sin esperar (más rápido)
+            const promises = researchesData.map(r => fetchCurrentPrice(r));
+            await Promise.all(promises);
+            
+            console.log('✅ Todos los precios cargados');
+        } catch (error) {
+            console.error('Error cargando precios:', error);
+        } finally {
+            // Renderizar siempre, aunque falle API
+            renderResults();
+        }
+    }
 
-            // HTML
-            container.innerHTML = Object.entries(grouped).map(([typeKey, items]) => {
-                const typeInfo = investmentTypes[typeKey];
-                return `
-                    <div class="investment-type-section">
-                        <div class="investment-type-header">
-                            <div class="investment-type-icon">${typeInfo.icon}</div>
-                            <div class="investment-type-title">${typeInfo.name}</div>
-                            <div class="investment-type-count">${items.length} análisis</div>
-                        </div>
-                        <div class="research-grid">
-                            ${items.map(item => `
-                                <a href="${item.path}" class="research-card">
-                                    <div class="card-header">
-                                        <div class="card-ticker">${item.ticker}</div>
-                                        <div class="card-company">${item.company}</div>
-                                        <div class="card-sector">${item.sector}</div>
-                                        <div class="card-upside"><span class="upside-positive">${item.upside}</span></div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="card-metrics">
-                                            <div class="metric"><span class="metric-label">Precio Actual</span><span class="metric-value">${item.currentPrice}</span></div>
-                                            <div class="metric"><span class="metric-label">Fair Value</span><span class="metric-value">${item.fairValue}</span></div>
-                                            <div class="metric"><span class="metric-label">Riesgo</span><span class="metric-value">${item.riskLevel}</span></div>
-                                        </div>
-                                        <div class="card-date">Análisis: ${item.date}</div>
-                                        <span class="card-button">Ver Análisis Completo →</span>
-                                    </div>
-                                </a>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('');
+    // ============================================
+    // DATOS: Array con research
+    // ============================================
+    let researchesData = [
+        {
+            id: 'puuilo',
+            path: './puuilo/index.html',
+            type: 'long-value-growth',
+            ticker: 'PUUILO.HE',
+            company: 'Puuilo',
+            sector: 'Retail - Home Décor',
+            
+            thesisDate: '2026-01-15',
+            thesisPrice: '€12,52',
+            thesisPriceRaw: 12.52,
+            
+            fairValue: '€26,62',
+            fairValueRaw: 26.62,
+            
+            upsideInitial: '+113%',
+            
+            ticker_finnhub: 'PUUILO.HE',
+            currentPrice: '€14,80',
+            currentPriceRaw: 14.80,
+            currency: '€',
+            upsideActual: calculateCurrentUpside(14.80, 26.62),
+            
+            riskLevel: 'Medio',
+            date: 'Enero 2026'
+        },
+        {
+            id: 'qepc',
+            path: './qepc/index.html',
+            type: 'turnaround',
+            ticker: 'QEPC',
+            company: 'Q.E.P. Co., Inc.',
+            sector: 'Herramientas y Accesorios',
+            
+            thesisDate: '2026-01-10',
+            thesisPrice: '€38',
+            thesisPriceRaw: 38,
+            
+            fairValue: '€45.83',
+            fairValueRaw: 45.83,
+            
+            upsideInitial: '+20.6%',
+            
+            ticker_finnhub: 'QEPC',
+            currentPrice: '€41,50',
+            currentPriceRaw: 41.50,
+            currency: '$',
+            upsideActual: calculateCurrentUpside(41.50, 45.83),
+            
+            riskLevel: 'Bajo',
+            date: 'Enero 2026'
+        },
+        {
+            id: 'edu',
+            path: './edu/index.html',
+            type: 'long-value-growth',
+            ticker: 'EDU.AX',
+            company: 'EDU Holdings Limited',
+            sector: 'Education Platform',
+            
+            thesisDate: '2026-01-12',
+            thesisPrice: 'AUD0.82',
+            thesisPriceRaw: 0.82,
+            
+            fairValue: 'AUD2.43',
+            fairValueRaw: 2.43,
+            
+            upsideInitial: '+207%',
+            
+            ticker_finnhub: 'EDU.AX',
+            currentPrice: 'AUD0.95',
+            currentPriceRaw: 0.95,
+            currency: 'AUD',
+            upsideActual: calculateCurrentUpside(0.95, 2.43),
+            
+            riskLevel: 'Bajo',
+            date: 'Enero 2026'
+        },
+        {
+            id: 'modg',
+            path: './modg/index.html',
+            type: 'demergers',
+            ticker: 'MODG',
+            company: 'CALLAWAYGOLF',
+            sector: 'Consumo retail',
+            
+            thesisDate: '2026-01-08',
+            thesisPrice: '$11.88',
+            thesisPriceRaw: 11.88,
+            
+            fairValue: '$22.88',
+            fairValueRaw: 22.88,
+            
+            upsideInitial: '+92.6%',
+            
+            ticker_finnhub: 'MODG',
+            currentPrice: '$12.50',
+            currentPriceRaw: 12.50,
+            currency: '$',
+            upsideActual: calculateCurrentUpside(12.50, 22.88),
+            
+            riskLevel: 'Bajo',
+            date: 'Enero 2026'
+        },
+        {
+            id: 'toya',
+            path: './toya/index.html',
+            type: 'long-value-growth',
+            ticker: 'TOA.WA',
+            company: 'TOYA S.A.',
+            sector: 'Herramientas y Accesorios',
+            
+            thesisDate: '2026-01-05',
+            thesisPrice: 'PLN9.26',
+            thesisPriceRaw: 9.26,
+            
+            fairValue: 'PLN14.14',
+            fairValueRaw: 14.14,
+            
+            upsideInitial: '+52.7%',
+            
+            ticker_finnhub: 'TOA.WA',
+            currentPrice: 'PLN9.80',
+            currentPriceRaw: 9.80,
+            currency: 'PLN',
+            upsideActual: calculateCurrentUpside(9.80, 14.14),
+            
+            riskLevel: 'Bajo',
+            date: 'Enero 2026'
+        }
+    ];
+
+    // ============================================
+    // VARIABLES GLOBALES
+    // ============================================
+    let activeFilters = new Set();
+    let sortBy = 'default';
+
+    // ============================================
+    // FUNCIÓN: Renderizar filtros
+    // ============================================
+    function renderFilters() {
+        const container = document.getElementById('filtersContainer');
+        container.innerHTML = Object.entries(investmentTypes).map(([key, type]) => `
+            <button 
+                class="filter-btn ${activeFilters.has(key) ? 'active' : ''}" 
+                onclick="toggleFilter('${key}')"
+                title="${type.description}"
+            >
+                ${type.icon} ${type.name}
+            </button>
+        `).join('');
+    }
+
+    // ============================================
+    // FUNCIÓN: Toggle filtro
+    // ============================================
+    function toggleFilter(typeKey) {
+        if (activeFilters.has(typeKey)) {
+            activeFilters.delete(typeKey);
+        } else {
+            activeFilters.add(typeKey);
+        }
+        updateClearButton();
+        renderResults();
+        renderFilters();
+    }
+
+    // ============================================
+    // FUNCIÓN: Limpiar filtros
+    // ============================================
+    function clearFilters() {
+        activeFilters.clear();
+        updateClearButton();
+        renderFilters();
+        renderResults();
+    }
+
+    // ============================================
+    // FUNCIÓN: Cambiar ordenamiento
+    // ============================================
+    function handleSortChange() {
+        const sortSelect = document.getElementById('sortSelect');
+        sortBy = sortSelect.value;
+        renderResults();
+    }
+
+    // ============================================
+    // FUNCIÓN: Actualizar botón limpiar
+    // ============================================
+    function updateClearButton() {
+        const btn = document.getElementById('clearFiltersBtn');
+        const badge = document.getElementById('filterCountBadge');
+        const count = activeFilters.size;
+        
+        if (count === 0) {
+            btn.disabled = true;
+            badge.style.display = 'none';
+        } else {
+            btn.disabled = false;
+            badge.textContent = count;
+            badge.style.display = 'inline-block';
+        }
+    }
+
+    // ============================================
+    // FUNCIÓN: Actualizar contador
+    // ============================================
+    function updateCounter(count) {
+        const counterElement = document.getElementById('totalCounter');
+        counterElement.textContent = count;
+        counterElement.style.transition = 'all 0.3s ease';
+        counterElement.style.transform = 'scale(1.1)';
+        setTimeout(() => {
+            counterElement.style.transform = 'scale(1)';
+        }, 150);
+    }
+
+    // ============================================
+    // FUNCIÓN: Renderizar resultados
+    // ============================================
+    function renderResults() {
+        const container = document.getElementById('resultsContainer');
+        
+        // Filtrar
+        const filtered = activeFilters.size === 0 
+            ? researchesData 
+            : researchesData.filter(r => activeFilters.has(r.type));
+
+        updateCounter(filtered.length);
+
+        if (filtered.length === 0) {
+            container.innerHTML = `<div class="no-results"><h3>📭 No hay análisis con estos filtros</h3></div>`;
+            return;
         }
 
-        // INICIAR
-        document.addEventListener('DOMContentLoaded', () => {
-            renderFilters();
-            renderResults();
+        // Agrupar por tipo
+        const grouped = {};
+        filtered.forEach(r => {
+            if (!grouped[r.type]) grouped[r.type] = [];
+            grouped[r.type].push(r);
         });
-    </script>
-</body>
-</html>
+
+        // Ordenamiento
+        Object.keys(grouped).forEach(typeKey => {
+            const items = grouped[typeKey];
+            
+            if (sortBy === 'upside-desc') {
+                items.sort((a, b) => {
+                    const upsideA = parseFloat(a.upsideActual.replace('+', '').replace('%', ''));
+                    const upsideB = parseFloat(b.upsideActual.replace('+', '').replace('%', ''));
+                    return upsideB - upsideA;
+                });
+            } else if (sortBy === 'upside-asc') {
+                items.sort((a, b) => {
+                    const upsideA = parseFloat(a.upsideActual.replace('+', '').replace('%', ''));
+                    const upsideB = parseFloat(b.upsideActual.replace('+', '').replace('%', ''));
+                    return upsideA - upsideB;
+                });
+            }
+        });
+
+        // Renderizado
+        container.innerHTML = Object.entries(grouped).map(([typeKey, items]) => {
+            const typeInfo = investmentTypes[typeKey];
+            return `
+                <div class="investment-type-section">
+                    <div class="investment-type-header">
+                        <div class="investment-type-icon">${typeInfo.icon}</div>
+                        <div class="investment-type-title">${typeInfo.name}</div>
+                        <div class="investment-type-count">${items.length} análisis</div>
+                    </div>
+                    <div class="research-grid">
+                        ${items.map(item => `
+                            <a href="${item.path}" class="research-card">
+                                <div class="card-header">
+                                    <div class="card-category">${typeInfo.icon} ${typeInfo.name}</div>
+                                    <div class="card-ticker">${item.ticker}</div>
+                                    <div class="card-company">${item.company}</div>
+                                    <div class="card-sector">${item.sector}</div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="card-indicators">
+                                        <!-- INDICADOR 1: Fecha Tesis -->
+                                        <div class="indicator indicator-date">
+                                            <div class="indicator-label">📅 Fecha Tesis</div>
+                                            <div class="indicator-value">${item.thesisDate}</div>
+                                        </div>
+                                        
+                                        <!-- INDICADOR 2: Precio Objetivo -->
+                                        <div class="indicator indicator-target">
+                                            <div class="indicator-label">🎯 Precio Objetivo</div>
+                                            <div class="indicator-value">${item.fairValue}</div>
+                                        </div>
+                                        
+                                        <!-- INDICADOR 3: Precio Actual -->
+                                        <div class="indicator">
+                                            <div class="indicator-label">💰 Precio Actual</div>
+                                            <div class="indicator-value">${item.currentPrice}</div>
+                                        </div>
+                                        
+                                        <!-- INDICADOR 4: Upside INICIAL (Manual) -->
+                                        <div class="indicator">
+                                            <div class="indicator-label">📊 Upside Inicial</div>
+                                            <div class="indicator-value" style="color: var(--accent-positive);">
+                                                ${item.upsideInitial}
+                                            </div>
+                                            <div class="indicator-subtext">(Tesis)</div>
+                                        </div>
+                                        
+                                        <!-- INDICADOR 5: Upside ACTUAL (Automático) -->
+                                        <div class="indicator ${getUpsideClass(item.upsideActual)}" style="grid-column: 1 / -1;">
+                                            <div class="indicator-label">
+                                                ${getUpsideSymbol(item.upsideActual)} Upside/Downside ACTUAL
+                                            </div>
+                                            <div class="indicator-value" style="font-size: 1.3em;">
+                                                ${item.upsideActual}
+                                            </div>
+                                            <div class="indicator-subtext">Ahora mismo</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- RIESGO -->
+                                    <div style="margin-top: 12px; text-align: center;">
+                                        <span class="risk-badge ${item.riskLevel === 'Bajo' ? 'risk-bajo' : item.riskLevel === 'Medio' ? 'risk-medio' : 'risk-alto'}">
+                                            ⚠️ Riesgo: ${item.riskLevel}
+                                        </span>
+                                    </div>
+
+                                    <div class="card-date">Análisis: ${item.date}</div>
+                                    <span class="card-button">▶ VER ANÁLISIS COMPLETO →</span>
+                                </div>
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Scroll suave si hay filtros
+        if (activeFilters.size > 0) {
+            setTimeout(() => {
+                document.querySelector('.investment-type-section')?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }, 100);
+        }
+    }
+
+    // ============================================
+    // INICIALIZACIÓN
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+        updateClearButton();
+        renderFilters();
+        loadAllPrices();  // ← Carga precios (API o manual) y luego renderiza
+    });
+</script>
